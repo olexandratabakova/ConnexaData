@@ -4,7 +4,6 @@ import networkx as nx
 from dash import html, dash_table, dcc
 from dash.dependencies import Input, Output
 from styles import (
-    button_style,
     error_message_style,
     layout_style,
     table_style,
@@ -12,9 +11,11 @@ from styles import (
     header_style,
     data_style,
     h1_style,
+    description_style,
     button_style_backtohome
 )
 from config import FILTERED_OUTPUT_DIR
+
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -29,6 +30,7 @@ def load_data(file_path):
             degrees = dict(G.degree())
 
             degrees_df = pd.DataFrame(list(degrees.items()), columns=["object", "degree"])
+            degrees_df = degrees_df.groupby("object", as_index=False).sum()
 
             return degrees_df
         except Exception as e:
@@ -36,11 +38,14 @@ def load_data(file_path):
     else:
         return html.Div("File not found!", style=error_message_style)
 
+
 def create_layout():
     tables_filtered_dir = FILTERED_OUTPUT_DIR
     files = sorted([f for f in os.listdir(tables_filtered_dir) if f.endswith('.txt')])
     default_file_path = os.path.join(tables_filtered_dir, files[0]) if files else None
-    result = load_data(default_file_path) if default_file_path else html.Div("No files found in tables_filtered directory!", style=error_message_style)
+
+    result = load_data(default_file_path) if default_file_path else html.Div(
+        "No files found in tables_filtered directory!", style=error_message_style)
 
     if isinstance(result, html.Div):
         return result
@@ -64,27 +69,58 @@ def create_layout():
     return html.Div(
         style=layout_style,
         children=[
+            html.Div(
+                style={
+                    'position': 'fixed',
+                    'top': '10px',
+                    'right': '10px',
+                    'zIndex': '1000'
+                },
+                children=[html.A("Back to Main Table", href="/table", style=button_style_backtohome)]
+            ),
             html.H1("ConnexaData", style=h1_style),
-            html.A("Back to Main Table", href="/table", style=button_style_backtohome),
+            html.P("This page allows you to see degree of objects. Select a file to view.", style=description_style),
             dcc.Dropdown(
                 id='file-dropdown',
                 options=[{'label': f, 'value': os.path.join(tables_filtered_dir, f)} for f in files],
-                value=default_file_path,
+                value=None,
                 style={'width': '50%', 'marginBottom': '20px'}
             ),
-            html.Div(table_content, style={'marginTop': '20px'})
+            html.Div(id='table-container', style={'marginTop': '20px'})
         ]
     )
 
+
 layout = create_layout()
+
 
 def register_callbacks(app):
     @app.callback(
-        Output('influence-table', 'data'),
+        Output('table-container', 'children'),
         [Input('file-dropdown', 'value')]
     )
     def update_table(file_path):
+        if file_path is None:
+            return html.Div("Please select a file to view the data.", style=description_style)
+
         result = load_data(file_path)
         if isinstance(result, html.Div):
-            return []
-        return result.to_dict('records')
+            return result
+
+        degrees_df = result
+
+        table_content = dash_table.DataTable(
+            id='influence-table',
+            columns=[
+                {"name": "Object", "id": "object"},
+                {"name": "Degree", "id": "degree", "type": "numeric"}
+            ],
+            data=degrees_df.to_dict('records'),
+            style_table=table_style,
+            style_cell=cell_style,
+            style_header=header_style,
+            style_data=data_style,
+            sort_action="native"
+        )
+
+        return table_content

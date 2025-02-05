@@ -26,8 +26,17 @@ def create_layout(file_list):
     return html.Div(
         style=table_style_text,
         children=[
+            html.Div(
+                style={
+                    'position': 'fixed',
+                    'top': '10px',
+                    'right': '10px',
+                    'zIndex': '1000'
+                },
+                children=[html.A("Back to Home", href="/", style=button_style_backtohome)]
+            ),
             html.H1("ConnexaData", style=h1_style),
-            html.P("This page allows you to view tables. Select a file to view its data.", style=description_style),
+            html.P("This page allows you to see tables. Select a file to view its data.", style=description_style),
             html.Div(
                 style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '20px'},
                 children=[
@@ -40,10 +49,6 @@ def create_layout(file_list):
                     ),
                     html.A("Go to Table Influence", href="/table_influence", style=button_style)
                 ]
-            ),
-            html.Div(
-                style={'textAlign': 'center', 'marginTop': '20px'},
-                children=[html.A("Back to Home", href="/", style=button_style_backtohome)]
             ),
             html.Div(
                 dash_table.DataTable(
@@ -86,10 +91,6 @@ def create_layout(file_list):
                     ]
                 ),
                 style={'marginTop': '20px'}
-            ),
-            html.Div(
-                style={'textAlign': 'center', 'marginTop': '20px'},
-                children=[html.A("Back to Home", href="/", style=button_style_backtohome)]
             )
         ]
     )

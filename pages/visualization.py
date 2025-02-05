@@ -11,7 +11,6 @@ from styles import (
     button_style2,
     sidebar_style,
     main_content_style,
-    width_slider_style
 )
 import networkx as nx
 import community as community_louvain
@@ -189,8 +188,11 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
                 ]
             ),
             html.Div(
-                html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome}),
-                style={'textAlign': 'center', 'marginTop': '20px'}
+                style={'textAlign': 'center', 'marginTop': '20px'},
+                children=[
+                    html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome}),
+                    # html.Button("Save as table (.csv)", id='save-table-button', style={**button_style2, 'marginLeft': '10px'}),
+                ]
             )
         ]
     )
@@ -207,7 +209,10 @@ def register_callbacks(app):
     )
     def update_visualization(n_clicks, selected_file, min_color, max_color, max_objects, avg_size):
         if n_clicks is None or not selected_file:
-            return html.Div("Please select a file and click 'Apply' to visualize.", style=error_message_style)
+            return html.Div([
+                html.Div("Please select a file and click 'Apply' to visualize.", style=error_message_style),
+                html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome})
+            ], style={'display': 'flex', 'flexDirection': 'column', 'justify-content': 'center', 'align-items': 'center', 'height': '100vh'})
         return create_layout(selected_file, min_color['hex'], max_color['hex'], max_objects, avg_size)
 
     @app.callback(
@@ -269,7 +274,7 @@ layout = html.Div(
         'flexDirection': 'row',
         'height': '100vh',
         'fontFamily': 'Helvetica',
-        'background': 'linear-gradient(180deg, #E2F9FB, #ffffff)',
+        'backgroundColor': '#FFFAEB',
     },
     children=[
         # Бічна панель
@@ -277,32 +282,13 @@ layout = html.Div(
             id='sidebar',
             style=sidebar_style,
             children=[
-                html.H3("ConnexaData", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px'}),
-
-                html.Label("Sidebar Width", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
-                html.Div(
-                    dcc.Slider(
-                        id='width-slider',
-                        min=20,
-                        max=50,
-                        step=5,
-                        value=40,
-                        marks={i: f'{i}%' for i in range(20, 51, 5)},
-                        tooltip={'placement': 'bottom', 'always_visible': True},
-                    ),
-                    style=width_slider_style
-                ),
+                html.H3("Visualization", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px', 'textAlign': 'center'}),
 
                 dcc.Dropdown(
                     id='file-dropdown',
                     options=[{'label': f, 'value': f} for f in get_filtered_files()],
-                    placeholder="Select a file",
-                    style={
-                        'width': '100%',
-                        'marginBottom': '20px',
-                        'fontFamily': 'Helvetica',
-                        'whiteSpace': 'normal',
-                    },
+                    placeholder="Select a document",
+                    style={'width': '100%', 'marginBottom': '10px', 'fontFamily': 'Helvetica'},
                     clearable=False,
                 ),
 
@@ -317,18 +303,14 @@ layout = html.Div(
                         {'label': 'Breadthfirst', 'value': 'breadthfirst'},
                         {'label': 'Cose', 'value': 'cose'}
                     ],
-                    value='random',
-                    placeholder="Select a layout",
-                    style={
-                        'width': '100%',
-                        'marginBottom': '20px',
-                        'fontFamily': 'Helvetica',
-                        'whiteSpace': 'normal',
-                    },
+                    placeholder="Select a preset",
+                    style={'width': '100%', 'marginBottom': '20px', 'fontFamily': 'Helvetica'},
                     clearable=False,
                 ),
 
-                html.Label("Text Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
+                html.H3("Size Settings", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px', 'textAlign': 'center'}),
+
+                html.Label("Text Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left'}),
                 html.Div(
                     dcc.Slider(
                         id='text-size-slider',
@@ -342,7 +324,7 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
 
-                html.Label("Node Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
+                html.Label("Node Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left', 'marginTop': '10px'}),
                 html.Div(
                     dcc.Slider(
                         id='node-size-slider',
@@ -356,7 +338,7 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
 
-                html.Label("Edge Thickness", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
+                html.Label("Edge Thickness", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left', 'marginTop': '10px'}),
                 html.Div(
                     dcc.Slider(
                         id='edge-thickness-slider',
@@ -370,44 +352,7 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
 
-                html.Div(
-                    style={'display': 'flex', 'alignItems': 'center', 'marginTop': '10px', 'width': '100%'},
-                    children=[
-                        html.Label("Min Color", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginRight': '10px'}),
-                        daq.ColorPicker(
-                            id='min-color-picker',
-                            value=dict(hex='#FF69B4'),
-                            style={'marginBottom': '20px', 'width': '100%'}
-                        )
-                    ]
-                ),
-                html.Div(
-                    style={'display': 'flex', 'alignItems': 'center', 'marginTop': '10px', 'width': '100%'},
-                    children=[
-                        html.Label("Max Color", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginRight': '10px'}),
-                        daq.ColorPicker(
-                            id='max-color-picker',
-                            value=dict(hex='#1E90FF'),
-                            style={'marginBottom': '20px', 'width': '100%'}
-                        )
-                    ]
-                ),
-
-                html.Label("Max Objects", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
-                html.Div(
-                    dcc.Slider(
-                        id='max-objects-slider',
-                        min=10,
-                        max=500,
-                        step=10,
-                        value=50,
-                        marks={i: str(i) for i in range(10, 501, 50)},
-                        tooltip={'placement': 'bottom', 'always_visible': True},
-                    ),
-                    style={'width': '90%', 'marginBottom': '20px'}
-                ),
-
-                html.Label("Average Node Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginTop': '10px'}),
+                html.Label("Average Node Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left', 'marginTop': '10px'}),
                 html.Div(
                     dcc.Slider(
                         id='avg-size-slider',
@@ -421,13 +366,55 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
 
+                html.H3("Colors", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px', 'textAlign': 'center'}),
+
                 html.Div(
-                    style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'width': '100%'},
+                    style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center',
+                           'marginTop': '10px', 'width': '100%'},
                     children=[
-                        html.Button("Apply", id='apply-button', style={**button_style2, 'marginTop': '20px', 'width': '100%'}),
-                        html.Button("Save as table (.csv)", id='save-table-button', style={**button_style2, 'marginTop': '10px', 'width': '100%'}),
+                        html.Div(
+                            style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center',
+                                   'width': '48%'},
+                            children=[
+                                html.Label("Min Color", style={'color': '#1B5E67', 'fontFamily': 'Helvetica',
+                                                               'marginBottom': '10px'}),
+                                daq.ColorPicker(
+                                    id='min-color-picker',
+                                    value=dict(hex='#FF69B4'),
+                                    style={'border': 'none', 'boxShadow': 'none', 'width': '100%'}
+                                )
+                            ]
+                        ),
+                        html.Div(
+                            style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center',
+                                   'width': '48%'},
+                            children=[
+                                html.Label("Max Color", style={'color': '#1B5E67', 'fontFamily': 'Helvetica',
+                                                               'marginBottom': '10px'}),
+                                daq.ColorPicker(
+                                    id='max-color-picker',
+                                    value=dict(hex='#1E90FF'),
+                                    style={'border': 'none', 'boxShadow': 'none', 'width': '100%'}
+                                )
+                            ]
+                        )
                     ]
                 ),
+
+                html.Label("Max Objects", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left'}),
+                html.Div(
+                    dcc.Slider(
+                        id='max-objects-slider',
+                        min=10,
+                        max=500,
+                        step=10,
+                        value=50,
+                        marks={i: str(i) for i in range(10, 501, 50)},
+                        tooltip={'placement': 'bottom', 'always_visible': True},
+                    ),
+                    style={'width': '90%', 'marginBottom': '20px'}
+                ),
+                html.Button("Apply", id='apply-button', style={**button_style_backtohome, "border": "none"}),
             ]
         ),
 

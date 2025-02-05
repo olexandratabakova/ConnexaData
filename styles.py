@@ -106,11 +106,12 @@ button_style2 = {
     'marginTop': '20px',
     'marginBottom': '20px',
     'margin': '20px',
-    'display': 'inline-block',
     'fontFamily': 'Helvetica',
     'textAlign': 'center',
     'border': '2px solid #FCE7AB',
     'boxShadow': '0 0 30px 10px #FCE7AB',
+    "justifyContent": "center",
+    "display": "flex"
 }
 
 background_style = {
@@ -154,10 +155,15 @@ text_content_style = {
 }
 
 error_message_style = {
-    'fontSize': '24px',
-    'color': '#1B5E67',
-    'fontFamily': 'Helvetica',
+    "fontSize": "24px",
+    "color": "#1B5E67",
+    "fontFamily": "Helvetica",
+    "display": "flex",
+    "justifyContent": "center",
+    "alignItems": "center",
+    "height": "100vh",
 }
+
 
 layout_style = {
     'textAlign': 'center',
@@ -235,7 +241,7 @@ sidebar_style = {
     'width': '40%',
     'padding': '20px',
     'height': '100%',
-    'background': 'linear-gradient(0.25turn, #E2F9FB, #CEFCFF)',
+    'background': '#f0f3f6',
     'boxShadow': '2px 0 5px rgba(0,0,0,0.1)',
     'display': 'flex',
     'flexDirection': 'column',

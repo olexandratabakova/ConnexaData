@@ -4,84 +4,19 @@ from styles import common_styles, h1_style, description_style, button_style, but
 from config import TEXT_FILE_PATH, OUTPUT_DIR, FILTERED_OUTPUT_DIR, UPLOAD_DIR
 import os
 import base64
-from groq import Groq
 import PyPDF2
 from docx import Document
 import threading
 import re
-from config import api_key
-
-client = Groq(api_key=api_key)
+from utils.analysis import *
 
 analysis_running = False
 analysis_stop_event = threading.Event()
 progress = 0
-model = "llama-3.3-70b-versatile"
-languages = "Ukrainian"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(FILTERED_OUTPUT_DIR, exist_ok=True)
 
-def request_related_concepts(client, text_chunk):
-    prompt = (
-        f"Extract pairs of most related conspiracy-related concepts from the text. "
-        f"Each concept should be described in no more than 3 words. Format: 'Concept 1; Concept 2'. "
-        f"Each pair on a new line. Provide the answer in {languages}. "
-        f"Text: {text_chunk}"
-    )
-
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        model=model,
-        temperature=0,
-        max_tokens=1024,
-    )
-
-    return chat_completion.choices[0].message.content.strip()
-
-def request_related_people(client, text_chunk):
-    prompt = (
-        f"Extract pairs of most related people with specific surnames from the text. "
-        f"Each person should be described in no more than 3 words. Format: 'Surname 1; Surname 2'. "
-        f"Each pair on a new line. Give the answer on {languages} if there is person. Text: {text_chunk}"
-    )
-
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        model=model,
-        temperature=0,
-        max_tokens=1024,
-    )
-
-    return chat_completion.choices[0].message.content.strip()
-
-
-def request_the_most_influential_people(client, text_chunk):
-    prompt = (
-        f"Analyze the given text and identify the most influential individuals mentioned in it. "
-        f"Start with the person who acts as the initiator of actions or appears to give commands, if applicable. "
-        f"Each person should be described in no more than three words. Format: 'Surname 1; Surname 2', no more than two individuals per line. "
-        f"Provide the answer in {languages} if there is a person. "
-        f"Text: {text_chunk}"
-    )
-
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        model=model,
-        temperature=0,
-        max_tokens=1024,
-    )
-
-    return chat_completion.choices[0].message.content.strip()
 def filter_row(row):
     cleaned_row = re.sub(r'^\d+\.\s*', '', row)
     cleaned_row = re.sub(r'^-\s*', '', cleaned_row)
@@ -98,7 +33,7 @@ def filter_row(row):
             return False
     return True
 
-def process_text_chunks(file_path, output_dir, client, request_function, chunk_size=2400):
+def process_text_chunks(file_path, output_dir, client_openai, request_function, chunk_size=2400):
     global analysis_running, analysis_stop_event, progress
     analysis_running = True
     progress = 0
@@ -107,19 +42,23 @@ def process_text_chunks(file_path, output_dir, client, request_function, chunk_s
     output_file = os.path.join(output_dir, output_filename)
     filtered_output_filename = f"filtered_{output_filename}"
     filtered_output_file = os.path.join(FILTERED_OUTPUT_DIR, filtered_output_filename)
+
     with open(file_path, 'r', encoding='utf-8') as file:
         data = file.read().replace('\n', ' ')
     chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     if not os.path.exists(FILTERED_OUTPUT_DIR):
         os.makedirs(FILTERED_OUTPUT_DIR)
+
     with open(output_file, "w", encoding='utf-8') as output_file, open(filtered_output_file, "w", encoding='utf-8') as filtered_file:
         total_chunks = len(chunks)
         for i, chunk in enumerate(chunks):
             if analysis_stop_event.is_set():
                 break
-            result = request_function(client, chunk)
+
+            result = request_function(client_openai, chunk)
             output_file.write(result + "\n")
             filtered_result = "\n".join([line for line in result.split("\n") if filter_row(line)])
             filtered_file.write(filtered_result + "\n")
@@ -276,6 +215,12 @@ layout = html.Div(
                             children=[
                                 html.Div(id='text-content', style=text_content_style)
                             ]
+                        ),
+                        html.Div(
+                            style={'marginTop': '10px'},
+                            children=[
+                                html.Div(id='file-info', style={'fontSize': '14px', 'color': '#555'})
+                            ]
                         )
                     ]
                 ),
@@ -305,6 +250,7 @@ layout = html.Div(
     ]
 )
 
+
 def register_callbacks(app):
     @app.callback(
         [Output('file-dropdown', 'options'),
@@ -327,16 +273,24 @@ def register_callbacks(app):
         return [{'label': file, 'value': file} for file in file_list], None
 
     @app.callback(
-        Output('text-content', 'children'),
+        [Output('text-content', 'children'),
+         Output('file-info', 'children')],
         [Input('file-dropdown', 'value')]
     )
     def display_selected_file_content(selected_file):
         if not selected_file:
-            return "No file selected."
+            return "No file selected.", ""
 
         file_path = os.path.join(os.path.dirname(TEXT_FILE_PATH), selected_file)
         content = read_text_file(file_path)
-        return content
+
+        # Підрахунок кількості слів
+        word_count = len(content.split())
+
+        # Відображення назви файлу та кількості слів
+        file_info = f"File: {selected_file} | Words: {word_count}"
+
+        return content, file_info
 
     @app.callback(
         [Output('progress-container', 'style'),
@@ -351,7 +305,8 @@ def register_callbacks(app):
          Input('progress-interval', 'n_intervals')],
         State('file-dropdown', 'value')
     )
-    def update_progress(related_clicks, influential_clicks, related_concepts_clicks, stop_clicks, n_intervals, selected_file):
+    def update_progress(related_clicks, influential_clicks, related_concepts_clicks, stop_clicks, n_intervals,
+                        selected_file):
         global analysis_running, progress
 
         ctx = callback_context
@@ -360,17 +315,21 @@ def register_callbacks(app):
 
         trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-        if trigger_id in ['run-analysis-related-button', 'run-analysis-influential-button', 'run-analysis-related-concepts-button']:
+        if trigger_id in ['run-analysis-related-button', 'run-analysis-influential-button',
+                          'run-analysis-related-concepts-button']:
             if not selected_file:
                 return {'display': 'none'}, {'width': '0%'}, "Please select a file first.", True, {'display': 'none'}
 
             file_path = os.path.join(os.path.dirname(TEXT_FILE_PATH), selected_file)
             if trigger_id == 'run-analysis-related-button':
-                analysis_thread = threading.Thread(target=process_text_chunks, args=(file_path, OUTPUT_DIR, client, request_related_people))
+                analysis_thread = threading.Thread(target=process_text_chunks,
+                                                   args=(file_path, OUTPUT_DIR, client_openai, request_related_people))
             elif trigger_id == 'run-analysis-influential-button':
-                analysis_thread = threading.Thread(target=process_text_chunks, args=(file_path, OUTPUT_DIR, client, request_the_most_influential_people))
+                analysis_thread = threading.Thread(target=process_text_chunks, args=(
+                file_path, OUTPUT_DIR, client_openai, request_the_most_influential_people))
             elif trigger_id == 'run-analysis-related-concepts-button':
-                analysis_thread = threading.Thread(target=process_text_chunks, args=(file_path, OUTPUT_DIR, client, request_related_concepts))
+                analysis_thread = threading.Thread(target=process_text_chunks, args=(
+                file_path, OUTPUT_DIR, client_openai, request_related_concepts))
 
             analysis_thread.start()
 

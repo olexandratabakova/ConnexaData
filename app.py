@@ -1,4 +1,5 @@
 import dash
+import time
 from dash import dcc, html
 from dash.dependencies import Input, Output
 from pages import main, help_page, document, table, table_influence, visualization, statistics
@@ -8,16 +9,29 @@ server = app.server
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    dcc.Loading(
-        id="loading",
-        type="default",
-        color="#1B5E67",
-        children=[html.Div(id='page-content')]
-    )
+    html.Div([
+        dcc.Loading(
+            id="loading",
+            type="default",
+            color="#1B5E67",
+            children=[html.Div(id='page-content')],
+            style={
+                "position": "fixed",
+                "top": "50%",
+                "left": "50%",
+                "transform": "translate(-50%, -50%)"
+            }
+        )
+    ])
 ])
 
-@app.callback(Output('page-content', 'children'), [Input('url', 'pathname')])
+@app.callback(
+    Output('page-content', 'children'),
+    [Input('url', 'pathname')]
+)
 def display_page(pathname):
+    time.sleep(1)
+
     if pathname == '/help':
         return help_page.layout
     elif pathname == '/document':
