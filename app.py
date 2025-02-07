@@ -31,7 +31,6 @@ app.layout = html.Div([
 )
 def display_page(pathname):
     time.sleep(1)
-
     if pathname == '/help':
         return help_page.layout
     elif pathname == '/document':

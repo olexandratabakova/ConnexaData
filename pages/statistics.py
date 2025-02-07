@@ -1,69 +1,109 @@
 import os
+import logging
 from collections import Counter
-from dash import html, dcc, Input, Output
+from dash import html, dcc, Input, Output, no_update
 import plotly.express as px
 import pandas as pd
 import networkx as nx
 from config import FILTERED_OUTPUT_DIR
-
 from styles import common_styles, h1_style, button_style_backtohome, description_style
 
-def count_occurrences(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        data = file.read().splitlines()
-        objects = []
-        for line in data:
-            node1, node2 = map(str.strip, line.split(';'))
-            if node1 and node2:
-                objects.append(node1)
-                objects.append(node2)
-        return Counter(objects)
 
-def calculate_influence(file_path):
+logging.basicConfig(level=logging.ERROR)
+
+
+def safe_file_operation(func):
+    def wrapper(file_path, *args, **kwargs):
+        try:
+            if not os.path.exists(file_path):
+                return None
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                return func(file, *args, **kwargs)
+        except Exception as e:
+            logging.error(f"Error processing file {file_path}: {str(e)}")
+            return None
+
+    return wrapper
+
+
+@safe_file_operation
+def count_occurrences(file):
+    counter = Counter()
+    for line in file:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(';')
+        if len(parts) != 2:
+            continue
+        node1, node2 = map(str.strip, parts)
+        if node1:
+            counter[node1] += 1
+        if node2:
+            counter[node2] += 1
+    return counter or None
+
+
+@safe_file_operation
+def calculate_influence(file):
     G = nx.Graph()
-    with open(file_path, 'r', encoding='utf-8') as file:
-        data = file.read().splitlines()
-        for line in data:
-            node1, node2 = map(str.strip, line.split(';'))
-            if node1 and node2:
-                G.add_edge(node1, node2)
-    G.remove_nodes_from(list(nx.isolates(G)))
-    degree_dict = dict(G.degree())
-    return degree_dict
+    for line in file:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(';')
+        if len(parts) != 2:
+            continue
+        node1, node2 = map(str.strip, parts)
+        if node1 and node2:
+            G.add_edge(node1, node2)
 
-def create_bar_chart(data, title, top_n=50, color="#FCE7AB"):
-    filtered_data = {k: v for k, v in data.items() if v > 3}
+    if G.number_of_nodes() == 0:
+        return None
 
-    if not filtered_data:
-        return "No objects with more than 3 occurrences found."
+    isolates = list(nx.isolates(G))
+    if isolates:
+        G.remove_nodes_from(isolates)
 
-    df = pd.DataFrame(list(filtered_data.items()), columns=["Object", "Count"])
-    df = df.sort_values(by="Count", ascending=False).head(top_n)
+    return dict(G.degree()) if G else None
 
-    fig = px.bar(
-        df,
-        x="Object",
-        y="Count",
-        title=title,
-        labels={"Object": "Object", "Count": "Count"},
-        text_auto=True,
-        hover_data={"Object": True, "Count": True},
-        color_discrete_sequence=[color],
-    )
 
-    fig.update_layout(
-        xaxis_title="Object",
-        yaxis_title="Count",
-        xaxis_tickangle=-45,
-        template="plotly_white",
-        width=1200,
-        height=600,
-    )
+def create_visualization(data, title, color):
+    if not data:
+        return html.Div(f"No data available for {title}", style={'color': 'gray'})
 
-    return fig
+    try:
+        filtered_data = {k: v for k, v in data.items() if v > 3}
+        if not filtered_data:
+            return html.Div(f"No significant data for {title} (all values ≤3)", style={'color': 'gray'})
+
+        df = pd.DataFrame(filtered_data.items(), columns=["Object", "Count"])
+        df = df.sort_values("Count", ascending=False).head(50)
+
+        fig = px.bar(
+            df,
+            x="Object",
+            y="Count",
+            title=title,
+            labels={"Object": "Object", "Count": "Count"},
+            text_auto=True,
+            color_discrete_sequence=[color],
+        )
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=40, b=40),
+            height=400
+        )
+        return dcc.Graph(figure=fig)
+
+    except Exception as e:
+        logging.error(f"Visualization error: {str(e)}")
+        return html.Div(f"Error creating {title} visualization", style={'color': 'red'})
+
 
 layout = html.Div(
-    style={**common_styles, 'height': '100vh', 'padding': '0px', 'position': 'relative'},
+    style={**common_styles, 'padding': '0px', 'position': 'relative'},
     children=[
         html.H1("ConnexaData", style=h1_style),
         html.Div(
@@ -83,17 +123,28 @@ layout = html.Div(
                     id='file-selector',
                     options=[
                         {'label': file, 'value': os.path.join(FILTERED_OUTPUT_DIR, file)}
-                        for file in os.listdir(FILTERED_OUTPUT_DIR)
+                        for file in sorted(os.listdir(FILTERED_OUTPUT_DIR))
                         if file.endswith('.txt')
                     ],
                     placeholder="Select a file",
-                    style={'width': '50%', 'margin': 'auto'}
+                    style={'width': '50%', 'margin': 'auto'},
+                    clearable=False
                 ),
-                html.Div(id='output-container', style={'marginTop': '20px'})
+                html.Div(
+                    id='output-container',
+                    style={
+                        'marginTop': '20px',
+                        'display': 'flex',
+                        'flexWrap': 'wrap',
+                        'justifyContent': 'center',
+                        'gap': '20px'
+                    }
+                )
             ]
         )
     ]
 )
+
 
 def register_callbacks(app):
     @app.callback(
@@ -101,19 +152,21 @@ def register_callbacks(app):
         Input('file-selector', 'value')
     )
     def update_output(file_path):
-        if file_path is None:
-            return "Please select a file."
+        if not file_path or not os.path.exists(file_path):
+            return html.Div("Please select a valid file.", style={'color': 'gray'})
 
-        counts = count_occurrences(file_path)
-        influence = calculate_influence(file_path)
+        try:
+            counts = count_occurrences(file_path)
+            influence = calculate_influence(file_path)
 
-        fig_counts = create_bar_chart(counts, "Most Frequent Objects", color="#FCE7AB")
-        fig_degree = create_bar_chart(influence, "Node Degrees", color="#CEFCFF")
+            visualizations = []
+            if counts:
+                visualizations.append(create_visualization(counts, "Most Frequent Objects", "#FCE7AB"))
+            if influence:
+                visualizations.append(create_visualization(influence, "Node Degrees", "#CEFCFF"))
 
-        return html.Div(
-            style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'center', 'gap': '20px'},
-            children=[
-                dcc.Graph(figure=fig_counts),
-                dcc.Graph(figure=fig_degree)
-            ]
-        )
+            return visualizations or html.Div("No valid data found in selected file", style={'color': 'gray'})
+
+        except Exception as e:
+            logging.error(f"Callback error: {str(e)}")
+            return html.Div("Error processing selected file", style={'color': 'red'})

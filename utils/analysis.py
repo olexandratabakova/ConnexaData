@@ -1,3 +1,6 @@
+# f"Extract pairs of most related people with specific surnames from the text. "
+# f"Each person should be described in no more than 3 words. Format: 'Surname 1; Surname 2'. "
+# f"Each pair on a new line. Give the answer on {languages} if there is person. Text: {text_chunk}"
 from config_keys import api_groq_key, api_openai_key
 from groq import Groq
 from openai import OpenAI
@@ -8,10 +11,10 @@ model = "gpt-4o-mini"
 languages = "Ukrainian"
 def request_related_concepts(client_openai, text_chunk):
     prompt = (
-        f"Extract pairs of most related conspiracy-related concepts from the text. "
+        f"Extract pairs of most related concepts from the text. "
         f"Each concept should be described in no more than 3 words. "
         f"Additionally, include related organizations and speakers involved in the conspiracy. "
-        f"Return the concepts, organizations, and speakers in pairs where possible."
+        f"Return the concepts, speakers in pairs where possible."
         f"Text: {text_chunk}"
     )
 
@@ -30,13 +33,12 @@ def request_related_concepts(client_openai, text_chunk):
 def request_related_people(client_openai, text_chunk):
     prompt = (
         f"Extract pairs of most related people with specific surnames from the text. "
-        f"Each person should be described in no more than 3 words. Format: 'Surname 1; Surname 2'. "
-        f"Each pair on a new line. Give the answer on {languages} if there is person. Text: {text_chunk}"
+        f"Each person should be described in no more than 3 words. Text: {text_chunk}"
     )
 
     chat_completion = client_openai.chat.completions.create(
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": f"Format: 'Surname 1; Surname 2'. Each pair on a new line. Provide the answer in {languages}."},
             {"role": "user", "content": prompt}
         ],
         model=model,
@@ -51,13 +53,12 @@ def request_the_most_influential_people(client_openai, text_chunk): #related_obj
     prompt = (
         f"Analyze the provided data and identify related entities, such as companies, speakers, or competitors."
         f"For each pair of related objects, display the connection in a row, with two objects per row." 
-        f"Result in {languages}"
         f"Text: {text_chunk}"
     )
 
     chat_completion = client_openai.chat.completions.create(
         messages=[
-            {"role": "system", "content": "Format: 'Object 1; Object 2'"},
+            {"role": "system", "content": f"Format: 'Object 1; Object 2'. Result in {languages}"},
             {"role": "user", "content": prompt}
         ],
         model=model,

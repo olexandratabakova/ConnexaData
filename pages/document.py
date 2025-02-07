@@ -1,14 +1,11 @@
-from dash import dcc, html, dash, callback_context
+from dash import dcc, html, callback_context
 from dash.dependencies import Input, Output, State
 from styles import common_styles, h1_style, description_style, button_style, button_style2, text_content_style, button_style_backtohome
 from config import TEXT_FILE_PATH, OUTPUT_DIR, FILTERED_OUTPUT_DIR, UPLOAD_DIR
-import os
-import base64
-import PyPDF2
-from docx import Document
 import threading
 import re
 from utils.analysis import *
+from utils.converting_documents import *
 
 analysis_running = False
 analysis_stop_event = threading.Event()
@@ -67,70 +64,8 @@ def process_text_chunks(file_path, output_dir, client_openai, request_function, 
     analysis_stop_event.clear()
     return output_file
 
-def read_text_file(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return file.read()
-    else:
-        return "File not found."
-
 def get_file_list(directory):
     return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-
-def extract_text_from_pdf(file_path):
-    with open(file_path, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text()
-        return text
-
-def extract_text_from_docx(file_path):
-    doc = Document(file_path)
-    text = ""
-    for paragraph in doc.paragraphs:
-        text += paragraph.text + "\n"
-    return text
-
-def save_uploaded_file(contents, filename, upload_dir):
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-
-    upload_path = os.path.join(upload_dir, filename)
-    with open(upload_path, 'wb') as f:
-        f.write(decoded)
-
-    return upload_path
-
-def process_uploaded_file(file_path):
-    if file_path.endswith('.txt'):
-        return read_text_file(file_path)
-    elif file_path.endswith('.pdf'):
-        return extract_text_from_pdf(file_path)
-    elif file_path.endswith('.docx'):
-        return extract_text_from_docx(file_path)
-    else:
-        return "Unsupported file format."
-
-def convert_to_txt(file_path, upload_dir):
-    if file_path.endswith('.pdf'):
-        text = extract_text_from_pdf(file_path)
-    elif file_path.endswith('.docx'):
-        text = extract_text_from_docx(file_path)
-    elif file_path.endswith('.txt'):
-        return file_path
-    else:
-        return None
-
-    txt_filename = os.path.splitext(os.path.basename(file_path))[0] + '.txt'
-    txt_file_path = os.path.join(upload_dir, txt_filename)
-
-    with open(txt_file_path, 'w', encoding='utf-8') as txt_file:
-        txt_file.write(text)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
-    return txt_file_path
 
 file_list = get_file_list(os.path.dirname(TEXT_FILE_PATH))
 
@@ -284,10 +219,8 @@ def register_callbacks(app):
         file_path = os.path.join(os.path.dirname(TEXT_FILE_PATH), selected_file)
         content = read_text_file(file_path)
 
-        # Підрахунок кількості слів
         word_count = len(content.split())
 
-        # Відображення назви файлу та кількості слів
         file_info = f"File: {selected_file} | Words: {word_count}"
 
         return content, file_info
