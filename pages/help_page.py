@@ -5,7 +5,7 @@ layout = html.Div(
     style={**common_styles, 'height': '100vh', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'},
     children=[
         html.Div(
-            style={'width': '60%', 'maxWidth': '700px', 'paddingLeft': '40px', 'paddingRight': '40px'},  # Smaller width
+            style={'width': '60%', 'maxWidth': '700px', 'paddingLeft': '40px', 'paddingRight': '40px'},
             children=[
                 html.H1("ConnexaData - Help", style=h1_style),
                 html.Div(

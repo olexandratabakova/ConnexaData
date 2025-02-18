@@ -280,8 +280,7 @@ def register_callbacks(app):
         elif trigger_id == 'progress-interval':
             if analysis_running:
                 return {'display': 'block'}, {'width': f'{progress}%',
-                                              'backgroundColor': '#007acc'}, f"{progress}%", False, {'display': 'block',
-                                                                                                     **button_style2}
+                                              'backgroundColor': '#007acc'}, f"{progress}%", False, {'display': 'block', **button_style2}
             else:
                 return {'display': 'none'}, {'width': '0%'}, "", True, {'display': 'none'}
 

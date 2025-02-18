@@ -15,7 +15,7 @@ from styles import (
     description_style
 )
 from config import FILTERED_OUTPUT_DIR
-
+from utils.dropdown import create_dropdown
 def load_data(file_name):
     input_file = os.path.join(FILTERED_OUTPUT_DIR, file_name)
     df = pd.read_csv(input_file, sep=';', header=None, encoding='utf-8', on_bad_lines='skip').fillna('')
@@ -40,13 +40,7 @@ def create_layout(file_list):
             html.Div(
                 style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '20px'},
                 children=[
-                    dcc.Dropdown(
-                        id='file-dropdown',
-                        options=[{'label': file, 'value': file} for file in file_list],
-                        value=None,
-                        placeholder="Select a file...",
-                        style={'width': '50%'}
-                    ),
+                    create_dropdown(),
                     html.A("Go to Table Influence", href="/table_influence", style=button_style)
                 ]
             ),

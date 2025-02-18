@@ -11,14 +11,16 @@ from styles import (
 import dash_daq as daq
 from utils.nodes import *
 import os
+import pandas as pd
+from dash.exceptions import PreventUpdate
+from utils.dropdown import get_file_list, clean_filename
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
 os.makedirs(CSV_DIR, exist_ok=True)
 
-
 def get_filtered_files():
-    return [f for f in os.listdir(FILTERED_OUTPUT_DIR) if f.endswith('.txt')]
-
+    file_list = get_file_list(FILTERED_OUTPUT_DIR)
+    return [{'label': clean_filename(f), 'value': f} for f in file_list if f.endswith('.txt')]
 
 def create_layout(file_name, min_color, max_color, max_objects, avg_size):
     nodes, edges, error_message = load_data(file_name, min_color, max_color, max_objects, avg_size)
@@ -63,14 +65,18 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
                 id='node-info-container',
                 style={
                     'position': 'fixed',
-                    'bottom': '20px',
-                    'right': '20px',
+                    'top': '20px',
+                    'left': '20px',
                     'background': 'white',
                     'padding': '15px',
-                    'borderRadius': '10px',
+                    'borderRadius': '8px',
                     'boxShadow': '0 2px 10px rgba(0,0,0,0.1)',
                     'maxWidth': '300px',
-                    'display': 'none'
+                    'zIndex': 1000,
+                    'display': 'none',
+                    'fontFamily': 'Helvetica',
+                    'fontSize': '13px',
+                    'marginLeft': '310px'
                 }
             ),
             html.Div(
@@ -82,101 +88,6 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
         ]
     )
 
-
-def register_callbacks(app):
-    @app.callback(
-        Output('visualization-content', 'children'),
-        Input('apply-button', 'n_clicks'),
-        State('file-dropdown', 'value'),
-        State('min-color-picker', 'value'),
-        State('max-color-picker', 'value'),
-        State('max-objects-slider', 'value'),
-        State('avg-size-slider', 'value')
-    )
-    def update_visualization(n_clicks, selected_file, min_color, max_color, max_objects, avg_size):
-        if n_clicks is None or not selected_file:
-            return html.Div([
-                html.Div("Please select a file and click 'Apply' to visualize.", style=error_message_style),
-                html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome})
-            ], style={'display': 'flex', 'flexDirection': 'column', 'justify-content': 'center',
-                      'align-items': 'center', 'height': '100vh'})
-        return create_layout(selected_file, min_color['hex'], max_color['hex'], max_objects, avg_size)
-
-    @app.callback(
-        Output('cytoscape-graph', 'stylesheet'),
-        Input('apply-button', 'n_clicks'),
-        State('text-size-slider', 'value'),
-        State('node-size-slider', 'value'),
-        State('edge-thickness-slider', 'value')
-    )
-    def update_stylesheet(n_clicks, text_size, node_size, edge_thickness):
-        if n_clicks is None:
-            return []
-
-        return [
-            {
-                'selector': 'node',
-                'style': {
-                    'content': 'data(label)',
-                    'font-size': f"{text_size}px",
-                    'background-color': 'data(color)',
-                    'width': 'data(size)',
-                    'height': 'data(size)',
-                    'border-color': 'data(border_color)',
-                    'border-width': '2px',
-                    'text-halign': 'center',
-                    'text-valign': 'center',
-                    'font-family': 'Helvetica'
-                }
-            },
-            {
-                'selector': 'edge',
-                'style': {
-                    'line-color': 'data(color)',
-                    'width': f'{edge_thickness}',
-                    'target-arrow-shape': 'triangle',
-                    'target-arrow-color': 'data(color)',
-                    'font-family': 'Helvetica'
-                }
-            }
-        ]
-
-    @app.callback(
-        Output('cytoscape-graph', 'layout'),
-        Input('layout-dropdown', 'value')
-    )
-    def update_layout(selected_layout):
-        return {'name': selected_layout}
-
-    @app.callback(
-        Output('sidebar', 'style'),
-        Input('width-slider', 'value')
-    )
-    def update_sidebar_width(width):
-        return {**sidebar_style, 'width': f'{width}%'}
-
-    @app.callback(
-        Output('node-info-container', 'children'),
-        Output('node-info-container', 'style'),
-        Input('cytoscape-graph', 'tapNodeData'),
-    )
-    def show_node_info(node_data):
-        if not node_data:
-            return [], {'display': 'none'}
-
-        merged_parts = node_data.get('merged_parts', [])
-        if not merged_parts:
-            return [], {'display': 'none'}
-
-        content = [
-            html.H4("Об'єднані частини:", style={'color': '#1B5E67', 'marginBottom': '10px'}),
-            html.Ul([html.Li(part, style={'marginBottom': '5px'}) for part in merged_parts])
-        ]
-
-        return content, {'display': 'block'}
-
-
-# Layout сторінки
 layout = html.Div(
     style={
         'display': 'flex',
@@ -186,7 +97,7 @@ layout = html.Div(
         'backgroundColor': '#FFFAEB',
     },
     children=[
-        # Бічна панель
+        dcc.Download(id="download-csv"),
         html.Div(
             id='sidebar',
             style=sidebar_style,
@@ -196,7 +107,7 @@ layout = html.Div(
 
                 dcc.Dropdown(
                     id='file-dropdown',
-                    options=[{'label': f, 'value': f} for f in get_filtered_files()],
+                    options=get_filtered_files(),
                     placeholder="Select a document",
                     style={'width': '100%', 'marginBottom': '10px', 'fontFamily': 'Helvetica'},
                     clearable=False,
@@ -331,6 +242,8 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
                 html.Button("Apply", id='apply-button', style={**button_style_backtohome, "border": "none"}),
+                html.Button("Save to CSV", id='save-csv-button',
+                            style={**button_style_backtohome, "border": "none", "marginTop": "10px"}),
             ]
         ),
 
@@ -343,3 +256,161 @@ layout = html.Div(
         )
     ]
 )
+
+def register_callbacks(app):
+    @app.callback(
+        Output('visualization-content', 'children'),
+        Input('apply-button', 'n_clicks'),
+        State('file-dropdown', 'value'),
+        State('min-color-picker', 'value'),
+        State('max-color-picker', 'value'),
+        State('max-objects-slider', 'value'),
+        State('avg-size-slider', 'value')
+    )
+    def update_visualization(n_clicks, selected_file, min_color, max_color, max_objects, avg_size):
+        if n_clicks is None or not selected_file:
+            return html.Div([
+                html.Div("Please select a file and click 'Apply' to visualize.", style=error_message_style),
+                html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome})
+            ], style={'display': 'flex', 'flexDirection': 'column', 'justify-content': 'center',
+                      'align-items': 'center', 'height': '100vh'})
+        return create_layout(selected_file, min_color['hex'], max_color['hex'], max_objects, avg_size)
+
+    @app.callback(
+        Output('cytoscape-graph', 'stylesheet'),
+        Input('apply-button', 'n_clicks'),
+        State('text-size-slider', 'value'),
+        State('node-size-slider', 'value'),
+        State('edge-thickness-slider', 'value')
+    )
+    def update_stylesheet(n_clicks, text_size, node_size, edge_thickness):
+        if n_clicks is None:
+            return []
+
+        return [
+            {
+                'selector': 'node',
+                'style': {
+                    'content': 'data(label)',
+                    'font-size': f"{text_size}px",
+                    'background-color': 'data(color)',
+                    'width': 'data(size)',
+                    'height': 'data(size)',
+                    'border-color': 'data(border_color)',
+                    'border-width': '2px',
+                    'text-halign': 'center',
+                    'text-valign': 'center',
+                    'font-family': 'Helvetica'
+                }
+            },
+            {
+                'selector': 'edge',
+                'style': {
+                    'line-color': 'data(color)',
+                    'width': f'{edge_thickness}',
+                    'target-arrow-shape': 'triangle',
+                    'target-arrow-color': 'data(color)',
+                    'font-family': 'Helvetica'
+                }
+            }
+        ]
+
+    @app.callback(
+        Output('cytoscape-graph', 'layout'),
+        Input('layout-dropdown', 'value')
+    )
+    def update_layout(selected_layout):
+        return {'name': selected_layout}
+
+    @app.callback(
+        Output('sidebar', 'style'),
+        Input('width-slider', 'value')
+    )
+    def update_sidebar_width(width):
+        return {**sidebar_style, 'width': f'{width}%'}
+
+    @app.callback(
+        Output('node-info-container', 'children'),
+        Output('node-info-container', 'style'),
+        Input('cytoscape-graph', 'tapNodeData'),
+    )
+    def show_node_info(node_data):
+        if not node_data:
+            return [], {'display': 'none'}
+
+        merged_parts = node_data.get('merged_parts', [])
+        if not merged_parts:
+            return [], {'display': 'none'}
+
+        content = [
+            html.Div(
+                [
+                    html.Strong("Об'єднані частини:", style={
+                        'color': '#1B5E67',
+                        'fontSize': '14px',
+                        'marginBottom': '10px',
+                        'display': 'block'
+                    }),
+                    html.Ul(
+                        [
+                            html.Li(
+                                part,
+                                style={
+                                    'margin': '8px 0',
+                                    'padding': '8px',
+                                    'backgroundColor': '#f8f9fa',
+                                    'borderRadius': '4px',
+                                    'transition': '0.3s',
+                                    'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
+                                }
+                            ) for part in merged_parts
+                        ],
+                        style={
+                            'listStyleType': 'none',
+                            'padding': '0',
+                            'margin': '0'
+                        }
+                    )
+                ],
+                style={'maxHeight': '400px', 'overflowY': 'auto'}
+            )
+        ]
+
+        return content, {
+            'display': 'block',
+            'position': 'fixed',
+            'left': '500px',
+            'top': '20px',
+            'background': 'white',
+            'borderRadius': '3px',
+            'zIndex': 1000
+        }
+
+    @app.callback(
+        Output('download-csv', 'data'),
+        Input('save-csv-button', 'n_clicks'),
+        State('cytoscape-graph', 'elements'),
+        State('file-dropdown', 'value'),
+        prevent_initial_call=True
+    )
+    def save_csv(n_clicks, elements, selected_file):
+        if n_clicks is None or not elements:
+            raise PreventUpdate
+
+        edges = [e['data'] for e in elements if 'source' in e['data']]
+        rows = []
+        for edge in edges:
+            rows.append({
+                'Source': edge['source'],
+                'Target': edge['target'],
+                'Strength': edge.get('weight', 'N/A')
+            })
+
+        df = pd.DataFrame(rows)
+
+        base_name = os.path.splitext(selected_file)[0]
+        csv_filename = f"{base_name}_connections.csv"
+        csv_path = os.path.join(CSV_DIR, csv_filename)
+        df.to_csv(csv_path, index=False)
+
+        return dcc.send_data_frame(df.to_csv, csv_filename, index=False)

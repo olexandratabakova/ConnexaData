@@ -7,7 +7,7 @@ import pandas as pd
 import networkx as nx
 from config import FILTERED_OUTPUT_DIR
 from styles import common_styles, h1_style, button_style_backtohome, description_style
-
+from utils.dropdown import create_dropdown
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -71,15 +71,12 @@ def calculate_influence(file):
 def create_visualization(data, title, color):
     if not data:
         return html.Div(f"No data available for {title}", style={'color': 'gray'})
-
     try:
         filtered_data = {k: v for k, v in data.items() if v > 3}
         if not filtered_data:
             return html.Div(f"No significant data for {title} (all values ≤3)", style={'color': 'gray'})
-
         df = pd.DataFrame(filtered_data.items(), columns=["Object", "Count"])
         df = df.sort_values("Count", ascending=False).head(50)
-
         fig = px.bar(
             df,
             x="Object",
@@ -96,7 +93,6 @@ def create_visualization(data, title, color):
             height=400
         )
         return dcc.Graph(figure=fig)
-
     except Exception as e:
         logging.error(f"Visualization error: {str(e)}")
         return html.Div(f"Error creating {title} visualization", style={'color': 'red'})
@@ -108,9 +104,7 @@ layout = html.Div(
         html.H1("ConnexaData", style=h1_style),
         html.Div(
             style={'position': 'fixed', 'top': '20px', 'right': '20px'},
-            children=[
-                html.A("Back to Home", href="/", style=button_style_backtohome)
-            ]
+            children=[html.A("Back to Home", href="/", style=button_style_backtohome)]
         ),
         html.Div(
             style={'marginTop': '0px', 'textAlign': 'center'},
@@ -119,17 +113,7 @@ layout = html.Div(
                     "This is a page with statistics about your texts (degree, mention of words in the text).",
                     style=description_style
                 ),
-                dcc.Dropdown(
-                    id='file-selector',
-                    options=[
-                        {'label': file, 'value': os.path.join(FILTERED_OUTPUT_DIR, file)}
-                        for file in sorted(os.listdir(FILTERED_OUTPUT_DIR))
-                        if file.endswith('.txt')
-                    ],
-                    placeholder="Select a file",
-                    style={'width': '50%', 'margin': 'auto'},
-                    clearable=False
-                ),
+                create_dropdown('file-selector'),
                 html.Div(
                     id='output-container',
                     style={
@@ -151,13 +135,18 @@ def register_callbacks(app):
         Output('output-container', 'children'),
         Input('file-selector', 'value')
     )
-    def update_output(file_path):
-        if not file_path or not os.path.exists(file_path):
-            return html.Div("Please select a valid file.", style={'color': 'gray'})
+    def update_output(selected_filename):
+        if not selected_filename:
+            return html.Div("Please select a file.", style={'color': 'gray'})
+
+        full_path = os.path.join(FILTERED_OUTPUT_DIR, selected_filename)
+
+        if not os.path.exists(full_path):
+            return html.Div("Selected file not found.", style={'color': 'gray'})
 
         try:
-            counts = count_occurrences(file_path)
-            influence = calculate_influence(file_path)
+            counts = count_occurrences(full_path)
+            influence = calculate_influence(full_path)
 
             visualizations = []
             if counts:
@@ -168,5 +157,5 @@ def register_callbacks(app):
             return visualizations or html.Div("No valid data found in selected file", style={'color': 'gray'})
 
         except Exception as e:
-            logging.error(f"Callback error: {str(e)}")
+            logging.error(f"Error processing file: {str(e)}")
             return html.Div("Error processing selected file", style={'color': 'red'})
