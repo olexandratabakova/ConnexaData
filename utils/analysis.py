@@ -72,7 +72,7 @@ def request_related_concepts(client_groq, text_chunk):
     prompt = (
         f"Extract pairs of most related concepts from the text. "
         f"Each concept should be described in no more than 3 words. "
-        f"Additionally, include related organizations and speakers involved in the conspiracy. "
+        f"Additionally, related entities, such as companies, speakers, or competitors. "
         f"Return the concepts, speakers in pairs where possible."
         f"Text: {text_chunk}"
     )
@@ -108,11 +108,11 @@ def request_related_people(client_groq, text_chunk):
     return chat_completion.choices[0].message.content.strip()
 
 
-def request_the_most_influential_people(client_groq, text_chunk): #related_objects
+def request_the_most_influential_people(client_groq, text_chunk):
     prompt = (
-        f"Analyze the provided data and identify related entities, such as companies, speakers, or competitors."
-        f"For each pair of related objects, display the connection in a row, with two objects per row." 
-        f"Text: {text_chunk}"
+        "Analyse the given text and identify the most influential individuals mentioned in it."
+        "Start with the person who acts as the initiator of actions or appears to give commands, if applicable."
+        "Each person should be described in no more than three words. Text: {text_chunk}"
     )
 
     chat_completion = client_groq.chat.completions.create(
