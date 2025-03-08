@@ -1,13 +1,13 @@
 import os
 import logging
 from collections import Counter
-from dash import html, dcc, Input, Output, no_update
+from dash import html, dcc, Input, Output
 import plotly.express as px
 import pandas as pd
 import networkx as nx
 from config import FILTERED_OUTPUT_DIR
 from styles import common_styles, h1_style, button_style_backtohome, description_style
-from utils.dropdown import create_dropdown
+from components.dropdown import create_dropdown
 
 logging.basicConfig(level=logging.ERROR)
 

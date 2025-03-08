@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from dash import html, dash_table, dcc
+from dash import html, dash_table
 from dash.dependencies import Input, Output
 from styles import (
     table_style,
@@ -15,7 +15,7 @@ from styles import (
     description_style
 )
 from config import FILTERED_OUTPUT_DIR
-from utils.dropdown import create_dropdown
+from components.dropdown import create_dropdown
 def load_data(file_name):
     input_file = os.path.join(FILTERED_OUTPUT_DIR, file_name)
     df = pd.read_csv(input_file, sep=';', header=None, encoding='utf-8', on_bad_lines='skip').fillna('')

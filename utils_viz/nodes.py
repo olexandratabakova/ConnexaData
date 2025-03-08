@@ -3,12 +3,15 @@ from dash import html
 import networkx as nx
 from styles import error_message_style
 from config import *
-from utils.nodes_color import *
+from utils_viz.nodes_color import *
 import community as community_louvain
 import os
 
 def normalize_text(text):
     return str(text).strip().lower()
+
+def capitalize_first_letter(text):
+    return text[0].upper() + text[1:] if text else text
 
 def calculate_node_positions(nodes, edges):
     G = nx.Graph()
@@ -58,7 +61,8 @@ def load_data(file_name, min_color, max_color, max_objects, avg_size):
 
             for node in [source, target]:
                 if node not in node_dict:
-                    node_dict[node] = {'data': {'id': node, 'label': node.title(), 'merged_parts': [node]}}
+                    capitalized_label = capitalize_first_letter(node)
+                    node_dict[node] = {'data': {'id': node, 'label': capitalized_label, 'merged_parts': [capitalized_label]}}
                     degree_dict[node] = 0
 
             if source != target:
@@ -83,7 +87,8 @@ def load_data(file_name, min_color, max_color, max_objects, avg_size):
 
             for original, merged in merged_mapping.items():
                 if merged not in new_node_dict:
-                    new_node_dict[merged] = node_dict.get(merged, {'data': {'id': merged, 'label': merged.title(), 'merged_parts': []}})
+                    capitalized_label = capitalize_first_letter(merged)
+                    new_node_dict[merged] = node_dict.get(merged, {'data': {'id': merged, 'label': capitalized_label, 'merged_parts': []}})
                     new_degree_dict[merged] = 0
 
                 new_node_dict[merged]['data']['merged_parts'].extend(node_dict[original]['data']['merged_parts'])

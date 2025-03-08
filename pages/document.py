@@ -6,6 +6,7 @@ import threading
 import re
 from utils.analysis import *
 from utils.converting_documents import *
+import os
 
 analysis_running = False
 analysis_stop_event = threading.Event()
@@ -13,6 +14,8 @@ progress = 0
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(FILTERED_OUTPUT_DIR, exist_ok=True)
+
+selected_model = "llama-3.3-70b-versatile"
 
 def filter_row(row):
     cleaned_row = re.sub(r'^\d+\.\s*', '', row)
@@ -30,7 +33,7 @@ def filter_row(row):
             return False
     return True
 
-def process_text_chunks(file_path, output_dir, client_openai, request_function, chunk_size=2400):
+def process_text_chunks(file_path, output_dir, request_function, chunk_size=2400):
     global analysis_running, analysis_stop_event, progress
     analysis_running = True
     progress = 0
@@ -55,7 +58,7 @@ def process_text_chunks(file_path, output_dir, client_openai, request_function, 
             if analysis_stop_event.is_set():
                 break
 
-            result = request_function(client_openai, chunk)
+            result = request_function(chunk, selected_model)
             output_file.write(result + "\n")
             filtered_result = "\n".join([line for line in result.split("\n") if filter_row(line)])
             filtered_file.write(filtered_result + "\n")
@@ -115,6 +118,18 @@ layout = html.Div(
                         html.Div(
                             style={'display': 'flex', 'flexDirection': 'column', 'marginTop': '10px'},
                             children=[
+                                html.Div([
+                                    dcc.RadioItems(
+                                        id='model-selector',
+                                        options=[
+                                            {'label': 'llama-3.3-70b-versatile', 'value': 'llama-3.3-70b-versatile'},
+                                            {'label': 'gpt-4o-mini', 'value': 'gpt-4o-mini'}
+                                        ],
+                                        value=selected_model,
+                                        labelStyle={'display': 'block', 'marginBottom': '10px'},
+                                        style = {'textAlign':'left'}
+                                    )
+                                ]),
                                 html.Button("Find connections between", id="run-analysis-related-button",
                                             style={**button_style, 'border': 'none', 'marginBottom': '10px'}),
                                 html.Div("Discover related people by name", style={'marginBottom': '20px'}),
@@ -256,13 +271,13 @@ def register_callbacks(app):
             file_path = os.path.join(os.path.dirname(TEXT_FILE_PATH), selected_file)
             if trigger_id == 'run-analysis-related-button':
                 analysis_thread = threading.Thread(target=process_text_chunks,
-                                                   args=(file_path, OUTPUT_DIR, client_openai, request_related_people))
+                                                   args=(file_path, OUTPUT_DIR, request_related_people))
             elif trigger_id == 'run-analysis-influential-button':
-                analysis_thread = threading.Thread(target=process_text_chunks, args=(
-                file_path, OUTPUT_DIR, client_openai, request_the_most_influential_people))
+                analysis_thread = threading.Thread(target=process_text_chunks,
+                                                   args=(file_path, OUTPUT_DIR, request_the_most_influential_people))
             elif trigger_id == 'run-analysis-related-concepts-button':
-                analysis_thread = threading.Thread(target=process_text_chunks, args=(
-                file_path, OUTPUT_DIR, client_openai, request_related_concepts))
+                analysis_thread = threading.Thread(target=process_text_chunks,
+                                                   args=(file_path, OUTPUT_DIR, request_related_concepts))
 
             analysis_thread.start()
 
@@ -285,5 +300,14 @@ def register_callbacks(app):
                 return {'display': 'none'}, {'width': '0%'}, "", True, {'display': 'none'}
 
         return {'display': 'none'}, {'width': '0%'}, "", True, {'display': 'none'}
+
+    @app.callback(
+        Output('model-selector', 'value'),
+        [Input('model-selector', 'value')]
+    )
+    def update_model_selection(model):
+        global selected_model
+        selected_model = model
+        return selected_model
 
     return app

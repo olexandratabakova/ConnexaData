@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import networkx as nx
-from dash import html, dash_table, dcc
+from dash import html, dash_table
 from dash.dependencies import Input, Output
 from styles import (
     error_message_style,
@@ -15,7 +15,7 @@ from styles import (
     button_style_backtohome
 )
 from config import FILTERED_OUTPUT_DIR
-from utils.dropdown import create_dropdown
+from components.dropdown import create_dropdown
 
 
 def load_data(file_path):

@@ -8,11 +8,11 @@ REMOVE_PATTERNS = [
     "filtered_output_request_"
 ]
 
-def get_file_list(directory):
-    return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+def get_file_list(FILTERED_OUTPUT_DIR):
+    return [f for f in os.listdir(FILTERED_OUTPUT_DIR) if os.path.isfile(os.path.join(FILTERED_OUTPUT_DIR, f))]
 
-def clean_filename(filename):
-    cleaned_name = filename
+def clean_filename(FILTERED_OUTPUT_DIR):
+    cleaned_name = FILTERED_OUTPUT_DIR
     for pattern in REMOVE_PATTERNS:
         cleaned_name = cleaned_name.replace(pattern, "")
     return cleaned_name.lstrip("_").strip()

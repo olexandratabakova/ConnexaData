@@ -1,4 +1,4 @@
-from dash import html, dcc, Input, Output, State
+from dash import dcc, Input, Output, State
 import dash_cytoscape as cyto
 from styles import (
     visualization_layout_style,
@@ -9,18 +9,17 @@ from styles import (
     main_content_style,
 )
 import dash_daq as daq
-from utils.nodes import *
+from utils_viz.nodes import *
 import os
 import pandas as pd
 from dash.exceptions import PreventUpdate
-from utils.dropdown import get_file_list, clean_filename
+from components.dropdown import get_file_list
+from components.node_panels import create_rename_panel
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
 os.makedirs(CSV_DIR, exist_ok=True)
 
-def get_filtered_files():
-    file_list = get_file_list(FILTERED_OUTPUT_DIR)
-    return [{'label': clean_filename(f), 'value': f} for f in file_list if f.endswith('.txt')]
+
 
 def create_layout(file_name, min_color, max_color, max_objects, avg_size):
     nodes, edges, error_message = load_data(file_name, min_color, max_color, max_objects, avg_size)
@@ -66,7 +65,6 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
                 style={
                     'position': 'fixed',
                     'top': '20px',
-                    'left': '20px',
                     'background': 'white',
                     'padding': '15px',
                     'borderRadius': '8px',
@@ -76,7 +74,6 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
                     'display': 'none',
                     'fontFamily': 'Helvetica',
                     'fontSize': '13px',
-                    'marginLeft': '310px'
                 }
             ),
             html.Div(
@@ -107,7 +104,7 @@ layout = html.Div(
 
                 dcc.Dropdown(
                     id='file-dropdown',
-                    options=get_filtered_files(),
+                    options=get_file_list(FILTERED_OUTPUT_DIR),
                     placeholder="Select a document",
                     style={'width': '100%', 'marginBottom': '10px', 'fontFamily': 'Helvetica'},
                     clearable=False,
@@ -130,7 +127,7 @@ layout = html.Div(
                 ),
 
                 html.H3("Size Settings", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px',
-                                                'textAlign': 'center'}),
+                                                'textAlign': 'center', 'marginTop': '-10px'}),
 
                 html.Label("Text Size", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left'}),
                 html.Div(
@@ -242,8 +239,8 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
                 html.Button("Apply", id='apply-button', style={**button_style_backtohome, "border": "none"}),
-                html.Button("Save to CSV", id='save-csv-button',
-                            style={**button_style_backtohome, "border": "none", "marginTop": "10px"}),
+                # html.Button("Save to CSV", id='save-csv-button',
+                #             style={**button_style_backtohome, "border": "none", "marginTop": "10px"}),
             ]
         ),
 
@@ -342,49 +339,42 @@ def register_callbacks(app):
         if not merged_parts:
             return [], {'display': 'none'}
 
-        content = [
-            html.Div(
-                [
-                    html.Strong("Об'єднані частини:", style={
-                        'color': '#1B5E67',
-                        'fontSize': '14px',
-                        'marginBottom': '10px',
-                        'display': 'block'
-                    }),
-                    html.Ul(
-                        [
-                            html.Li(
-                                part,
-                                style={
-                                    'margin': '8px 0',
-                                    'padding': '8px',
-                                    'backgroundColor': '#f8f9fa',
-                                    'borderRadius': '4px',
-                                    'transition': '0.3s',
-                                    'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
-                                }
-                            ) for part in merged_parts
-                        ],
-                        style={
-                            'listStyleType': 'none',
-                            'padding': '0',
-                            'margin': '0'
-                        }
-                    )
-                ],
-                style={'maxHeight': '400px', 'overflowY': 'auto'}
-            )
-        ]
+        current_label = node_data.get('label', merged_parts[0])
+        content = create_rename_panel(merged_parts, current_label)
 
-        return content, {
+        panel_style = {
             'display': 'block',
             'position': 'fixed',
-            'left': '500px',
+            'right': '20px',  # Вирівнювання справа
             'top': '20px',
             'background': 'white',
-            'borderRadius': '3px',
-            'zIndex': 1000
+            'padding': '15px',
+            'borderRadius': '8px',
+            'boxShadow': '0 2px 10px rgba(0,0,0,0.1)',
+            'maxWidth': '300px',
+            'zIndex': 1000,
         }
+
+        return content, panel_style
+
+    @app.callback(
+        Output('cytoscape-graph', 'elements'),
+        Input('label-radio', 'value'),
+        State('cytoscape-graph', 'elements'),
+        State('cytoscape-graph', 'tapNodeData'),
+        prevent_initial_call=True
+    )
+    def update_node_label(selected_label, elements, node_data):
+        if not node_data:
+            raise PreventUpdate
+
+        updated_elements = []
+        for element in elements:
+            if 'data' in element and element['data'].get('id') == node_data.get('id'):
+                element['data']['label'] = selected_label
+            updated_elements.append(element)
+
+        return updated_elements
 
     @app.callback(
         Output('download-csv', 'data'),
@@ -414,3 +404,23 @@ def register_callbacks(app):
         df.to_csv(csv_path, index=False)
 
         return dcc.send_data_frame(df.to_csv, csv_filename, index=False)
+
+    @app.callback(
+        Output('cytoscape-graph', 'tapNodeData'),
+        Input('cytoscape-graph', 'tapNode'),
+        State('cytoscape-graph', 'tapNodeData')
+    )
+    def update_tap_node_data(tap_node, tap_node_data):
+        if tap_node:
+            return tap_node_data
+        return None
+
+    @app.callback(
+        Output('cytoscape-graph', 'selectedNodeData'),
+        Input('cytoscape-graph', 'selectedNodeData'),
+        State('cytoscape-graph', 'selectedNodeData')
+    )
+    def update_selected_node_data(selected_node_data, current_selected_node_data):
+        if selected_node_data:
+            return selected_node_data
+        return current_selected_node_data
