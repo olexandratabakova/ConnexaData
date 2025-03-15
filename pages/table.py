@@ -38,10 +38,19 @@ def create_layout(file_list):
             html.H1("ConnexaData", style=h1_style),
             html.P("This page allows you to see tables. Select a file to view its data.", style=description_style),
             html.Div(
-                style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '20px'},
+                style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '20px', 'width': '100%'},
                 children=[
-                    create_dropdown(),
-                    html.A("Go to Table Influence", href="/table_influence", style=button_style)
+                    html.Div(
+                        style={'marginRight': '800px', 'width': '100%'},
+                        children=[create_dropdown()]
+                    ),
+                    html.A("Go to Table Influence", href="/table_influence",
+                           style={
+                               **button_style,  # Ваші поточні стилі для кнопки
+                               'marginLeft': '20px',  # Відстань зліва від кнопки
+                               'whiteSpace': 'nowrap',  # Заборона переносу тексту
+                               'padding': '10px 20px',  # Внутрішні відступи (верх/низ, ліво/право)
+                               'flexShrink': '0'})
                 ]
             ),
             html.Div(

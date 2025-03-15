@@ -260,3 +260,33 @@ main_content_style = {
     'height': '100%',
     'backgroundColor': '#ffffff',
 }
+
+# Додамо ці стилі в файл styles.py
+merge_button_style = {
+    'backgroundColor': '#9F86C0',
+    'color': 'white',
+    'borderRadius': '20px',
+    'border': 'none',
+    'padding': '10px 20px',
+    'margin': '5px',
+    'cursor': 'pointer',
+    'fontFamily': 'Helvetica'
+}
+
+undo_button_style = {
+    'backgroundColor': '#E5989B',
+    'color': 'white',
+    'borderRadius': '20px',
+    'border': 'none',
+    'padding': '10px 20px',
+    'margin': '5px',
+    'cursor': 'pointer',
+    'fontFamily': 'Helvetica'
+}
+
+modal_style = {
+    'backgroundColor': 'rgba(255, 250, 235, 0.9)',
+    'borderRadius': '15px',
+    'padding': '20px',
+    'boxShadow': '0 4px 8px rgba(0,0,0,0.1)'
+}

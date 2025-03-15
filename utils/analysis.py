@@ -19,7 +19,7 @@ def request_related_concepts(text_chunk, model):
     prompt = (
         f"Extract pairs of most related concepts from the text. "
         f"Each concept should be described in no more than 3 words. "
-        f"Additionally, include related organizations and speakers involved in the conspiracy. "
+        f"Additionally, include related organizations and speakers"
         f"Return the concepts, speakers in pairs where possible. Text: {text_chunk}"
     )
 

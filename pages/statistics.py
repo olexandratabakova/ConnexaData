@@ -113,7 +113,11 @@ layout = html.Div(
                     "This is a page with statistics about your texts (degree, mention of words in the text).",
                     style=description_style
                 ),
-                create_dropdown('file-selector'),
+                html.Div(
+                    style={'width': '500px'},
+                    children=[
+                create_dropdown('file-selector')]
+                ),
                 html.Div(
                     id='output-container',
                     style={

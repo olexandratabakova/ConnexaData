@@ -1,4 +1,4 @@
-from dash import dcc, Input, Output, State
+from dash import dcc, Input, Output, State, html
 import dash_cytoscape as cyto
 from styles import (
     visualization_layout_style,
@@ -7,21 +7,20 @@ from styles import (
     button_style_backtohome,
     sidebar_style,
     main_content_style,
+    error_message_style
 )
 import dash_daq as daq
 from utils_viz.nodes import *
 import os
 import pandas as pd
 from dash.exceptions import PreventUpdate
-from components.dropdown import get_file_list
+from components.dropdown import create_dropdown
 from components.node_panels import create_rename_panel
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
 os.makedirs(CSV_DIR, exist_ok=True)
 
-
-
-def create_layout(file_name, min_color, max_color, max_objects, avg_size):
+def create_layout(file_name, min_color, max_color, max_objects, avg_size, node_spacing):
     nodes, edges, error_message = load_data(file_name, min_color, max_color, max_objects, avg_size)
     if error_message:
         return error_message
@@ -32,7 +31,7 @@ def create_layout(file_name, min_color, max_color, max_objects, avg_size):
             cyto.Cytoscape(
                 id='cytoscape-graph',
                 elements=nodes + edges,
-                layout={'name': 'preset'},
+                layout={'name': 'preset', 'spacingFactor': node_spacing / 100},
                 style=visualization_cytoscape_style,
                 stylesheet=[
                     {
@@ -101,15 +100,7 @@ layout = html.Div(
             children=[
                 html.H3("Visualization", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'marginBottom': '20px',
                                                 'textAlign': 'center'}),
-
-                dcc.Dropdown(
-                    id='file-dropdown',
-                    options=get_file_list(FILTERED_OUTPUT_DIR),
-                    placeholder="Select a document",
-                    style={'width': '100%', 'marginBottom': '10px', 'fontFamily': 'Helvetica'},
-                    clearable=False,
-                ),
-
+                create_dropdown(),
                 dcc.Dropdown(
                     id='layout-dropdown',
                     options=[
@@ -168,6 +159,20 @@ layout = html.Div(
                         step=1,
                         value=2,
                         marks={i: str(i) for i in range(1, 11, 1)},
+                        tooltip={'placement': 'bottom', 'always_visible': True},
+                    ),
+                    style={'width': '90%', 'marginBottom': '20px'}
+                ),
+
+                html.Label("Node Spacing", style={'color': '#1B5E67', 'fontFamily': 'Helvetica', 'textAlign': 'left', 'marginTop': '10px'}),
+                html.Div(
+                    dcc.Slider(
+                        id='node-spacing-slider',
+                        min=100,
+                        max=5000,
+                        step=50,
+                        value=100,
+                        marks={i: str(i) for i in range(100, 5000, 500)},
                         tooltip={'placement': 'bottom', 'always_visible': True},
                     ),
                     style={'width': '90%', 'marginBottom': '20px'}
@@ -239,8 +244,6 @@ layout = html.Div(
                     style={'width': '90%', 'marginBottom': '20px'}
                 ),
                 html.Button("Apply", id='apply-button', style={**button_style_backtohome, "border": "none"}),
-                # html.Button("Save to CSV", id='save-csv-button',
-                #             style={**button_style_backtohome, "border": "none", "marginTop": "10px"}),
             ]
         ),
 
@@ -262,16 +265,17 @@ def register_callbacks(app):
         State('min-color-picker', 'value'),
         State('max-color-picker', 'value'),
         State('max-objects-slider', 'value'),
-        State('avg-size-slider', 'value')
+        State('avg-size-slider', 'value'),
+        State('node-spacing-slider', 'value')
     )
-    def update_visualization(n_clicks, selected_file, min_color, max_color, max_objects, avg_size):
+    def update_visualization(n_clicks, selected_file, min_color, max_color, max_objects, avg_size, node_spacing):
         if n_clicks is None or not selected_file:
             return html.Div([
                 html.Div("Please select a file and click 'Apply' to visualize.", style=error_message_style),
                 html.A("Back to Home", href="/", style={**button_style, **button_style_backtohome})
             ], style={'display': 'flex', 'flexDirection': 'column', 'justify-content': 'center',
                       'align-items': 'center', 'height': '100vh'})
-        return create_layout(selected_file, min_color['hex'], max_color['hex'], max_objects, avg_size)
+        return create_layout(selected_file, min_color['hex'], max_color['hex'], max_objects, avg_size, node_spacing)
 
     @app.callback(
         Output('cytoscape-graph', 'stylesheet'),
@@ -320,13 +324,6 @@ def register_callbacks(app):
         return {'name': selected_layout}
 
     @app.callback(
-        Output('sidebar', 'style'),
-        Input('width-slider', 'value')
-    )
-    def update_sidebar_width(width):
-        return {**sidebar_style, 'width': f'{width}%'}
-
-    @app.callback(
         Output('node-info-container', 'children'),
         Output('node-info-container', 'style'),
         Input('cytoscape-graph', 'tapNodeData'),
@@ -345,7 +342,7 @@ def register_callbacks(app):
         panel_style = {
             'display': 'block',
             'position': 'fixed',
-            'right': '20px',  # Вирівнювання справа
+            'right': '20px',
             'top': '20px',
             'background': 'white',
             'padding': '15px',
